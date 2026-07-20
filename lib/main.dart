@@ -1,38 +1,39 @@
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
+import 'screens/splash_screen.dart';
+import 'utils/app_theme.dart';
 
 void main() {
   runApp(const HomeStashApp());
 }
 
-class HomeStashApp extends StatelessWidget {
+class HomeStashApp extends StatefulWidget {
   const HomeStashApp({super.key});
 
+  static final ValueNotifier<ThemeMode> themeNotifier =
+      ValueNotifier(ThemeMode.system);
+
+  @override
+  State<HomeStashApp> createState() => _HomeStashAppState();
+}
+
+class _HomeStashAppState extends State<HomeStashApp> {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: '家庭储物管家',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2E7D32),
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-        cardTheme: CardThemeData(
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: HomeStashApp.themeNotifier,
+      builder: (context, themeMode, _) {
+        return MaterialApp(
+          title: '家庭储物管家',
+          debugShowCheckedModeBanner: false,
+          themeMode: themeMode,
+          theme: buildLightTheme(),
+          darkTheme: buildDarkTheme(),
+          home: SplashScreen(
+            nextScreen: const HomeScreen(),
           ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          filled: true,
-        ),
-      ),
-      home: const HomeScreen(),
+        );
+      },
     );
   }
 }
