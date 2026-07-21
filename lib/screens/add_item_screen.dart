@@ -21,7 +21,6 @@ class _AddItemScreenState extends State<AddItemScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _categoryController = TextEditingController();
-  final _locationController = TextEditingController();
   final _noteController = TextEditingController();
 
   String? _photoPath;
@@ -35,10 +34,6 @@ class _AddItemScreenState extends State<AddItemScreen> {
     '文件资料', '玩具游戏', '清洁用品', '装饰品', '运动器材', '其他',
   ];
 
-  static const presetLocations = [
-    '客厅', '卧室', '厨房', '卫生间', '阳台', '储藏室', '车库', '玄关', '书房', '其他',
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -47,7 +42,6 @@ class _AddItemScreenState extends State<AddItemScreen> {
       final item = widget.existingItem!;
       _nameController.text = item.name;
       _categoryController.text = item.category;
-      _locationController.text = item.location;
       _noteController.text = item.note ?? '';
       _photoPath = item.photoPath;
       _loadSelectedSpace(item.spaceId);
@@ -65,7 +59,6 @@ class _AddItemScreenState extends State<AddItemScreen> {
   void dispose() {
     _nameController.dispose();
     _categoryController.dispose();
-    _locationController.dispose();
     _noteController.dispose();
     super.dispose();
   }
@@ -183,12 +176,18 @@ class _AddItemScreenState extends State<AddItemScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
 
+    // 自动填充位置标识
+    String getLocation() {
+      if (_selectedSpace != null) return _selectedSpace!.name;
+      return '未指定';
+    }
+
     try {
       if (widget.existingItem != null) {
         final updated = widget.existingItem!.copyWith(
           name: _nameController.text.trim(),
           category: _categoryController.text.trim(),
-          location: _locationController.text.trim(),
+          location: getLocation(),
           note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
           photoPath: _photoPath,
           spaceId: _selectedSpace?.id,
@@ -199,7 +198,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
         final item = Item(
           name: _nameController.text.trim(),
           category: _categoryController.text.trim(),
-          location: _locationController.text.trim(),
+          location: getLocation(),
           note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
           photoPath: _photoPath,
           spaceId: _selectedSpace?.id,
@@ -320,10 +319,6 @@ class _AddItemScreenState extends State<AddItemScreen> {
             _buildCategoryField(),
             const SizedBox(height: 16),
 
-            // 位置
-            _buildLocationField(),
-            const SizedBox(height: 16),
-
             // 备注
             TextFormField(
               controller: _noteController,
@@ -370,31 +365,6 @@ class _AddItemScreenState extends State<AddItemScreen> {
           children: presetCategories.map((cat) => ActionChip(
             label: Text(cat),
             onPressed: () => setState(() => _categoryController.text = cat),
-          )).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLocationField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextFormField(
-          controller: _locationController,
-          decoration: const InputDecoration(
-            labelText: '位置标识 *', hintText: '选择或输入位置',
-            prefixIcon: Icon(Icons.location_on_rounded),
-          ),
-          textInputAction: TextInputAction.next,
-          validator: (v) => (v == null || v.trim().isEmpty) ? '请输入位置' : null,
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8, runSpacing: 6,
-          children: presetLocations.map((loc) => ActionChip(
-            label: Text(loc),
-            onPressed: () => setState(() => _locationController.text = loc),
           )).toList(),
         ),
       ],
