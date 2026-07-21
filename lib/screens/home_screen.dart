@@ -1,7 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/item.dart';
+import '../models/storage_space.dart';
 import '../utils/database_helper.dart';
 import '../utils/app_theme.dart';
+import '../services/export_import_service.dart';
 import '../widgets/item_card.dart';
 import '../widgets/shimmer_loading.dart';
 import 'add_item_screen.dart';
@@ -192,6 +198,41 @@ class _ItemListPageState extends State<_ItemListPage> {
       appBar: AppBar(
         title: const Text('家庭储物管家'),
         actions: [
+          PopupMenuButton<_ExportAction>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: '更多操作',
+            onSelected: _handleExportAction,
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: _ExportAction.exportJson,
+                child: ListTile(
+                  leading: Icon(Icons.code),
+                  title: Text('导出 JSON 备份'),
+                  subtitle: Text('包含所有物品和空间数据'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const PopupMenuItem(
+                value: _ExportAction.exportCsv,
+                child: ListTile(
+                  leading: Icon(Icons.table_chart),
+                  title: Text('导出 CSV'),
+                  subtitle: Text('仅物品数据'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: _ExportAction.importBackup,
+                child: ListTile(
+                  leading: Icon(Icons.file_upload),
+                  title: Text('导入备份'),
+                  subtitle: Text('从 JSON/CSV 文件恢复数据'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          ),
           IconButton(
               icon: const Icon(Icons.filter_list),
               onPressed: _showFilterSheet,
@@ -403,6 +444,205 @@ class _ItemListPageState extends State<_ItemListPage> {
         icon,
         size: 54,
         color: color.withAlpha(180),
+      ),
+    );
+  }
+
+  // ====================== 导出/导入 ======================
+
+  void _handleExportAction(_ExportAction action) {
+    switch (action) {
+      case _ExportAction.exportJson:
+        _exportJson();
+      case _ExportAction.exportCsv:
+        _exportCsv();
+      case _ExportAction.importBackup:
+        _importBackup();
+    }
+  }
+
+  Future<void> _exportJson() async {
+    try {
+      final items = await _db.getAllItems();
+      final spaces = await _db.getAllSpaces();
+      final jsonStr = ExportImportService.exportToJson(
+        items: items,
+        spaces: spaces,
+      );
+
+      final dir = await getTemporaryDirectory();
+      final timestamp = DateTime.now()
+          .toIso8601String()
+          .replaceAll(':', '-')
+          .split('.')
+          .first;
+      final file = File('${dir.path}/homestash_backup_$timestamp.json');
+      await file.writeAsString(jsonStr);
+
+      if (mounted) {
+        await Share.shareXFiles(
+          [XFile(file.path)],
+          text: '家庭储物管家备份',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorDialog('导出失败：$e');
+      }
+    }
+  }
+
+  Future<void> _exportCsv() async {
+    try {
+      final items = await _db.getAllItems();
+      final csvStr = ExportImportService.exportItemsToCsv(items);
+
+      final dir = await getTemporaryDirectory();
+      final timestamp = DateTime.now()
+          .toIso8601String()
+          .replaceAll(':', '-')
+          .split('.')
+          .first;
+      final file = File('${dir.path}/homestash_items_$timestamp.csv');
+      await file.writeAsString(csvStr);
+
+      if (mounted) {
+        await Share.shareXFiles(
+          [XFile(file.path)],
+          text: '家庭储物管家 - 物品列表',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorDialog('导出失败：$e');
+      }
+    }
+  }
+
+  Future<void> _importBackup() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json', 'csv'],
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final file = File(result.files.single.path!);
+      final content = await file.readAsString();
+      final ext = result.files.single.extension?.toLowerCase();
+
+      // 询问导入策略
+      final strategy = await _showStrategyDialog();
+      if (strategy == null) return; // 用户取消
+
+      ImportResult importResult;
+      if (ext == 'json') {
+        importResult = await ExportImportService.importFromJson(
+          jsonString: content,
+          dbHelper: _db,
+          strategy: strategy,
+        );
+      } else {
+        importResult = await ExportImportService.importFromCsv(
+          csvString: content,
+          dbHelper: _db,
+          strategy: strategy,
+        );
+      }
+
+      if (mounted) {
+        _showImportResultDialog(importResult);
+        _loadData();
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorDialog('导入失败：$e');
+      }
+    }
+  }
+
+  Future<String?> _showStrategyDialog() async {
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('导入方式'),
+        content: const Text('请选择数据导入方式：\n\n• 合并：保留现有数据，追加导入\n• 替换：先清空所有数据，再导入'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          FilledButton.tonal(
+            onPressed: () => Navigator.pop(ctx, 'merge'),
+            child: const Text('合并'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, 'replace'),
+            child: const Text('替换'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showImportResultDialog(ImportResult result) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              result.hasErrors ? Icons.warning_amber : Icons.check_circle,
+              color: result.hasErrors ? Colors.orange : Colors.green,
+            ),
+            const SizedBox(width: 8),
+            Text(result.hasErrors ? '导入完成（有警告）' : '导入成功'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (result.itemsImported > 0)
+              Text('✓ 导入物品：${result.itemsImported} 件'),
+            if (result.spacesImported > 0)
+              Text('✓ 导入空间：${result.spacesImported} 个'),
+            if (result.itemsSkipped > 0)
+              Text('⚠ 跳过：${result.itemsSkipped} 件'),
+            if (result.errors.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              const Divider(),
+              ...result.errors.take(5).map((e) => Text('• $e',
+                  style: const TextStyle(fontSize: 12, color: Colors.red))),
+              if (result.errors.length > 5)
+                Text('...及其他 ${result.errors.length - 5} 条错误',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            ],
+          ],
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('错误'),
+        content: Text(message),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('确定'),
+          ),
+        ],
       ),
     );
   }
