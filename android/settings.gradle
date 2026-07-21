@@ -23,3 +23,15 @@ plugins {
 }
 
 include ":app"
+
+// Load flutter plugins
+def flutterProjectRoot = rootProject.projectDir.parentFile
+def pluginsFile = new File(flutterProjectRoot, ".flutter-plugins")
+def plugins = new Properties()
+if (pluginsFile.exists()) {
+    pluginsFile.withInputStream { plugins.load(it) }
+}
+plugins.each { name, path ->
+    include ":$name"
+    project(":$name").projectDir = new File(path)
+}

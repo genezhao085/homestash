@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import '../models/item.dart';
 import '../models/storage_space.dart';
 import '../utils/database_helper.dart';
@@ -70,6 +71,19 @@ class _AddItemScreenState extends State<AddItemScreen> {
   }
 
   Future<void> _pickPhoto(ImageSource source) async {
+    if (source == ImageSource.gallery) {
+      // macOS/桌面: 使用 file_picker 打开文件选择器
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'],
+      );
+      if (result != null && result.files.isNotEmpty && mounted) {
+        setState(() => _photoPath = result.files.first.path);
+      }
+      return;
+    }
+
+    // 拍照: 使用 image_picker
     final XFile? photo = await _picker.pickImage(source: source, maxWidth: 1600, imageQuality: 85);
     if (photo != null) setState(() => _photoPath = photo.path);
   }
