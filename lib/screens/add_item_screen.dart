@@ -84,11 +84,21 @@ class _AddItemScreenState extends State<AddItemScreen> {
     }
 
     // 拍照: 使用 image_picker
-    final XFile? photo = await _picker.pickImage(source: source, maxWidth: 1600, imageQuality: 85);
-    if (photo != null) setState(() => _photoPath = photo.path);
+    try {
+      final XFile? photo = await _picker.pickImage(source: source, maxWidth: 1600, imageQuality: 85);
+      if (photo != null) setState(() => _photoPath = photo.path);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('拍照失败: $e'), behavior: SnackBarBehavior.floating),
+        );
+      }
+    }
   }
 
   void _showPhotoSourceDialog() {
+    final isDesktop = !Platform.isAndroid && !Platform.isIOS;
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
@@ -98,11 +108,13 @@ class _AddItemScreenState extends State<AddItemScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(
-                leading: const Icon(Icons.camera_alt_rounded, size: 32),
-                title: const Text('拍照'),
-                onTap: () { Navigator.pop(ctx); _pickPhoto(ImageSource.camera); },
-              ),
+              // 桌面平台不显示拍照按钮（无摄像头）
+              if (!isDesktop)
+                ListTile(
+                  leading: const Icon(Icons.camera_alt_rounded, size: 32),
+                  title: const Text('拍照'),
+                  onTap: () { Navigator.pop(ctx); _pickPhoto(ImageSource.camera); },
+                ),
               ListTile(
                 leading: const Icon(Icons.photo_library_rounded, size: 32),
                 title: const Text('从相册选择'),
