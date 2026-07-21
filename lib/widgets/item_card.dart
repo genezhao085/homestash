@@ -84,7 +84,7 @@ class _ItemCardState extends State<ItemCard>
           borderRadius: BorderRadius.circular(14),
           child: Padding(
             padding: const EdgeInsets.all(12),
-            child: Row(
+              child: Row(
               children: [
                 // 左侧照片/占位
                 Container(
@@ -110,6 +110,21 @@ class _ItemCardState extends State<ItemCard>
                           color: Theme.of(context).colorScheme.primary,
                         ),
                 ),
+                // 过期标记小竖条
+                if (widget.item.expiryDate != null)
+                  Container(
+                    width: 3,
+                    height: 72,
+                    margin: const EdgeInsets.only(left: 8, right: 8),
+                    decoration: BoxDecoration(
+                      color: widget.item.isExpired
+                          ? Colors.red
+                          : widget.item.isExpiringSoon
+                              ? Colors.orange
+                              : Colors.grey.shade400,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
                 const SizedBox(width: 12),
                 // 中间信息
                 Expanded(

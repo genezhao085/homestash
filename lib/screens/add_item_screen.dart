@@ -407,6 +407,37 @@ class _AddItemScreenState extends State<AddItemScreen> {
               maxLines: 3,
               textInputAction: TextInputAction.done,
             ),
+            const SizedBox(height: 16),
+
+            // 过期日期
+            GestureDetector(
+              onTap: _pickExpiryDate,
+              child: AbsorbPointer(
+                child: TextFormField(
+                  decoration: InputDecoration(
+                    labelText: '过期日期（可选）',
+                    hintText: _expiryDate != null
+                        ? formatDate(_expiryDate!)
+                        : '设置物品过期日期',
+                    prefixIcon: Icon(
+                      _expiryDate != null ? Icons.event_busy : Icons.event,
+                      color: _expiryDate != null
+                          ? (_expiryDate!.isBefore(DateTime.now())
+                              ? Colors.red
+                              : Colors.orange)
+                          : null,
+                    ),
+                    suffixIcon: _expiryDate != null
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () =>
+                                setState(() => _expiryDate = null),
+                          )
+                        : const Icon(Icons.calendar_today),
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: 32),
 
             // 保存
