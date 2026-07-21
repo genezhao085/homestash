@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:file_picker/file_picker.dart';
 import '../models/item.dart';
 import '../models/storage_space.dart';
 import '../utils/database_helper.dart';
@@ -72,26 +71,55 @@ class _AddItemScreenState extends State<AddItemScreen> {
 
   Future<void> _pickPhoto(ImageSource source) async {
     if (source == ImageSource.gallery) {
-      // macOS/桌面: 使用 file_picker 打开文件选择器
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'],
-      );
-      if (result != null && result.files.isNotEmpty && mounted) {
-        setState(() => _photoPath = result.files.first.path);
+      // macOS: 使用 AppleScript 调用原生文件选择对话框
+      if (!Platform.isAndroid && !Platform.isIOS) {
+        try {
+          final result = await Process.run('osascript', [
+            '-e',
+            'set filePath to choose file with prompt "选择照片" of type {"jpg","jpeg","png","gif","webp","bmp"}',
+            '-e',
+            'if filePath is not "" then return POSIX path of filePath',
+          ]);
+          if (result.exitCode == 0) {
+            final path = (result.stdout as String).trim();
+            if (path.isNotEmpty && mounted) {
+              setState(() => _photoPath = path);
+            }
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('选择文件失败: $e'), behavior: SnackBarBehavior.floating),
+            );
+          }
+        }
+        return;
+      }
+      // 移动端: 使用 image_picker 从相册选择
+      try {
+        final XFile? photo = await _picker.pickImage(source: source, maxWidth: 1600, imageQuality: 85);
+        if (photo != null && mounted) setState(() => _photoPath = photo.path);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('选择照片失败: $e'), behavior: SnackBarBehavior.floating),
+          );
+        }
       }
       return;
     }
 
-    // 拍照: 使用 image_picker
-    try {
-      final XFile? photo = await _picker.pickImage(source: source, maxWidth: 1600, imageQuality: 85);
-      if (photo != null) setState(() => _photoPath = photo.path);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('拍照失败: $e'), behavior: SnackBarBehavior.floating),
-        );
+    // 拍照 (仅移动端): 使用 image_picker
+    if (Platform.isAndroid || Platform.isIOS) {
+      try {
+        final XFile? photo = await _picker.pickImage(source: source, maxWidth: 1600, imageQuality: 85);
+        if (photo != null && mounted) setState(() => _photoPath = photo.path);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('拍照失败: $e'), behavior: SnackBarBehavior.floating),
+          );
+        }
       }
     }
   }
