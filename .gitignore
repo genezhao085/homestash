@@ -13,7 +13,6 @@ build/
 .DS_Store
 *.app
 *.dSYM
-build/
 xcuserdata/
 Pods/
 
@@ -23,9 +22,10 @@ Pods/
 .local.properties
 android/.gradle/
 android/app/build/
-android/local.properties
+android/java_pid*.hprof
 
-# iOS
+# iOS / macOS Runner
+macos/Pods/
 ios/Pods/
 ios/.symlinks/
 ios/Flutter/Flutter.framework
@@ -44,3 +44,10 @@ ios/Flutter/Flutter.podspec
 
 # Logs
 *.log
+
+# Hermes agent artifacts
+.hermes/plans/
+
+# Misc
+.history
+*.tmp

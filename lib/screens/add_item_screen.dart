@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../models/item.dart';
 import '../models/storage_space.dart';
 import '../utils/database_helper.dart';
+import '../services/image_recognition_service.dart';
 import 'barcode_scanner_screen.dart';
 
 /// 添加/编辑物品页面
@@ -24,7 +25,9 @@ class _AddItemScreenState extends State<AddItemScreen> {
   final _noteController = TextEditingController();
 
   String? _photoPath;
+  String? _barcode;
   StorageSpace? _selectedSpace;
+  DateTime? _expiryDate; // 过期日期
   final _db = DatabaseHelper.instance;
   final _picker = ImagePicker();
   bool _saving = false;
@@ -44,6 +47,8 @@ class _AddItemScreenState extends State<AddItemScreen> {
       _categoryController.text = item.category;
       _noteController.text = item.note ?? '';
       _photoPath = item.photoPath;
+      _barcode = item.barcode;
+      _expiryDate = item.expiryDate;
       _loadSelectedSpace(item.spaceId);
     }
   }
@@ -78,6 +83,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
             final path = (result.stdout as String).trim();
             if (path.isNotEmpty && mounted) {
               setState(() => _photoPath = path);
+              _classifyPhoto(path);
             }
           }
         } catch (e) {
@@ -92,7 +98,10 @@ class _AddItemScreenState extends State<AddItemScreen> {
       // 移动端: 使用 image_picker 从相册选择
       try {
         final XFile? photo = await _picker.pickImage(source: source, maxWidth: 1600, imageQuality: 85);
-        if (photo != null && mounted) setState(() => _photoPath = photo.path);
+        if (photo != null && mounted) {
+          setState(() => _photoPath = photo.path);
+          _classifyPhoto(photo.path);
+        }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -107,7 +116,10 @@ class _AddItemScreenState extends State<AddItemScreen> {
     if (Platform.isAndroid || Platform.isIOS) {
       try {
         final XFile? photo = await _picker.pickImage(source: source, maxWidth: 1600, imageQuality: 85);
-        if (photo != null && mounted) setState(() => _photoPath = photo.path);
+        if (photo != null && mounted) {
+          setState(() => _photoPath = photo.path);
+          _classifyPhoto(photo.path);
+        }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -115,6 +127,30 @@ class _AddItemScreenState extends State<AddItemScreen> {
           );
         }
       }
+    }
+  }
+
+  /// 拍照/选图后自动调用 AI 识别物品名称和分类
+  Future<void> _classifyPhoto(String path) async {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('🔍 AI 识别中...'), behavior: SnackBarBehavior.floating, duration: Duration(seconds: 1)),
+    );
+    final result = await ImageRecognitionService.classifyImage(path);
+    if (!mounted) return;
+    if (result['name']!.isNotEmpty && _nameController.text.isEmpty) {
+      _nameController.text = result['name']!;
+    }
+    if (result['category']!.isNotEmpty && _categoryController.text.isEmpty) {
+      _categoryController.text = result['category']!;
+    }
+    if (result['name']!.isNotEmpty || result['category']!.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('AI 识别: ${result['name']} (${result['category']})'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -172,6 +208,22 @@ class _AddItemScreenState extends State<AddItemScreen> {
     if (result != null) setState(() => _selectedSpace = result);
   }
 
+  Future<void> _pickExpiryDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _expiryDate ?? now.add(const Duration(days: 30)),
+      firstDate: now.subtract(const Duration(days: 365)),
+      lastDate: now.add(const Duration(days: 365 * 10)),
+      helpText: '选择过期日期',
+      cancelText: '取消',
+      confirmText: '确定',
+    );
+    if (picked != null) {
+      setState(() => _expiryDate = picked);
+    }
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
@@ -190,7 +242,9 @@ class _AddItemScreenState extends State<AddItemScreen> {
           location: getLocation(),
           note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
           photoPath: _photoPath,
+          barcode: _barcode,
           spaceId: _selectedSpace?.id,
+          expiryDate: _expiryDate,
           updatedAt: DateTime.now(),
         );
         await _db.updateItem(updated);
@@ -201,7 +255,9 @@ class _AddItemScreenState extends State<AddItemScreen> {
           location: getLocation(),
           note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
           photoPath: _photoPath,
+          barcode: _barcode,
           spaceId: _selectedSpace?.id,
+          expiryDate: _expiryDate,
           createdAt: DateTime.now(),
         );
         await _db.insertItem(item);
@@ -272,12 +328,34 @@ class _AddItemScreenState extends State<AddItemScreen> {
                   icon: const Icon(Icons.qr_code_scanner_rounded, color: Colors.green),
                   tooltip: '扫描条码',
                   onPressed: () async {
-                    final barcode = await Navigator.push<String>(
+                    final result = await Navigator.push<Map<String, String>>(
                       context,
                       MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
                     );
-                    if (barcode != null && mounted) {
-                      _nameController.text = barcode;
+                    if (result != null && mounted) {
+                      // 商品名称
+                      if (result['name'] != null && result['name']!.isNotEmpty) {
+                        _nameController.text = result['name']!;
+                      } else {
+                        _nameController.text = result['barcode'] ?? '';
+                      }
+                      // 分类
+                      if (result['category'] != null && result['category']!.isNotEmpty) {
+                        _categoryController.text = result['category']!;
+                      }
+                      // 品牌 + 描述 → 备注
+                      final noteParts = <String>[];
+                      if (result['brand'] != null && result['brand']!.isNotEmpty) {
+                        noteParts.add('品牌: ${result['brand']}');
+                      }
+                      if (result['description'] != null && result['description']!.isNotEmpty) {
+                        noteParts.add(result['description']!);
+                      }
+                      if (noteParts.isNotEmpty) {
+                        _noteController.text = noteParts.join('\n');
+                      }
+                      // 保存条码值
+                      _barcode = result['barcode'];
                     }
                   },
                 ),

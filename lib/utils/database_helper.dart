@@ -23,7 +23,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2, // 升级到 v2：增加 spaces 表
+      version: 3, // v3: 增加 barcode 及 expiry_date 字段
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE items (
@@ -32,8 +32,10 @@ class DatabaseHelper {
             category TEXT NOT NULL,
             location TEXT NOT NULL,
             space_id INTEGER,
+            barcode TEXT,
             photo_path TEXT,
             note TEXT,
+            expiry_date TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT
           )
@@ -54,6 +56,9 @@ class DatabaseHelper {
         ''');
         await db.execute('''
           CREATE INDEX idx_items_space ON items(space_id)
+        ''');
+        await db.execute('''
+          CREATE INDEX idx_items_expiry ON items(expiry_date)
         ''');
       },
       onUpgrade: (db, oldVersion, newVersion) async {
@@ -76,6 +81,18 @@ class DatabaseHelper {
             await db.execute('ALTER TABLE items ADD COLUMN space_id INTEGER');
           } catch (_) {}
         }
+        if (oldVersion < 3) {
+          // v3: 增加 barcode 和过期日期字段
+          try {
+            await db.execute('ALTER TABLE items ADD COLUMN barcode TEXT');
+          } catch (_) {}
+          try {
+            await db.execute('ALTER TABLE items ADD COLUMN expiry_date TEXT');
+          } catch (_) {}
+          try {
+            await db.execute('CREATE INDEX idx_items_expiry ON items(expiry_date)');
+          } catch (_) {}
+        }
       },
     );
   }
@@ -89,9 +106,11 @@ class DatabaseHelper {
 
   Future<int> updateItem(Item item) async {
     final db = await database;
+    final map = item.toMap();
+    // update 不需要 id 在 map 里，whereArgs 提供
     return await db.update(
       'items',
-      item.toMap()..['id'] = item.id,
+      map,
       where: 'id = ?',
       whereArgs: [item.id],
     );
@@ -183,6 +202,115 @@ class DatabaseHelper {
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
+  // ====================== 过期物品查询 ======================
+
+  /// 获取即将过期的物品（7天内过期）
+  /// 按过期日期升序排列（最急的排前面）
+  Future<List<Item>> getExpiringSoonItems({int days = 7}) async {
+    final db = await database;
+    final now = DateTime.now();
+    final threshold = now.add(Duration(days: days));
+    final maps = await db.rawQuery(
+      '''SELECT * FROM items 
+         WHERE expiry_date IS NOT NULL 
+           AND expiry_date >= ? 
+           AND expiry_date <= ?
+         ORDER BY expiry_date ASC''',
+      [now.toIso8601String(), threshold.toIso8601String()],
+    );
+    return maps.map((m) => Item.fromMap(m)).toList();
+  }
+
+  /// 获取所有已过期的物品
+  Future<List<Item>> getExpiredItems() async {
+    final db = await database;
+    final now = DateTime.now();
+    final maps = await db.rawQuery(
+      '''SELECT * FROM items 
+         WHERE expiry_date IS NOT NULL 
+           AND expiry_date < ?
+         ORDER BY expiry_date ASC''',
+      [now.toIso8601String()],
+    );
+    return maps.map((m) => Item.fromMap(m)).toList();
+  }
+
+  /// 获取所有有过期日期的物品，支持排序和筛选
+  /// [filter]: 'all' | 'expired' | 'expiring_soon'
+  /// [sortBy]: 'expiry_asc' | 'expiry_desc' | 'name_asc'
+  Future<List<Item>> getItemsWithExpiry({
+    String filter = 'all',
+    String sortBy = 'expiry_asc',
+  }) async {
+    final db = await database;
+    final now = DateTime.now();
+    final threshold = now.add(const Duration(days: 7));
+
+    String where = 'expiry_date IS NOT NULL';
+    final List<dynamic> whereArgs = [];
+
+    switch (filter) {
+      case 'expired':
+        where += ' AND expiry_date < ?';
+        whereArgs.add(now.toIso8601String());
+        break;
+      case 'expiring_soon':
+        where += ' AND expiry_date >= ? AND expiry_date <= ?';
+        whereArgs.addAll([now.toIso8601String(), threshold.toIso8601String()]);
+        break;
+      case 'all':
+      default:
+        break; // 不过滤，所有有过期日期的都返回
+    }
+
+    String orderBy;
+    switch (sortBy) {
+      case 'expiry_desc':
+        orderBy = 'expiry_date DESC';
+        break;
+      case 'name_asc':
+        orderBy = 'name ASC';
+        break;
+      case 'expiry_asc':
+      default:
+        orderBy = 'expiry_date ASC';
+        break;
+    }
+
+    final maps = await db.rawQuery(
+      'SELECT * FROM items WHERE $where ORDER BY $orderBy',
+      whereArgs,
+    );
+    return maps.map((m) => Item.fromMap(m)).toList();
+  }
+
+  /// 获取即将过期的物品数量
+  Future<int> getExpiringSoonCount({int days = 7}) async {
+    final db = await database;
+    final now = DateTime.now();
+    final threshold = now.add(Duration(days: days));
+    final result = await db.rawQuery(
+      '''SELECT COUNT(*) as cnt FROM items 
+         WHERE expiry_date IS NOT NULL 
+           AND expiry_date >= ? 
+           AND expiry_date <= ?''',
+      [now.toIso8601String(), threshold.toIso8601String()],
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  /// 获取已过期物品数量
+  Future<int> getExpiredCount() async {
+    final db = await database;
+    final now = DateTime.now();
+    final result = await db.rawQuery(
+      '''SELECT COUNT(*) as cnt FROM items 
+         WHERE expiry_date IS NOT NULL AND expiry_date < ?''',
+      [now.toIso8601String()],
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
   // ====================== 空间 CRUD ======================
 
   Future<int> insertSpace(StorageSpace space) async {
@@ -194,7 +322,7 @@ class DatabaseHelper {
     final db = await database;
     return await db.update(
       'spaces',
-      space.toMap()..['id'] = space.id,
+      space.toMap(),
       where: 'id = ?',
       whereArgs: [space.id],
     );
@@ -290,4 +418,9 @@ class DatabaseHelper {
 
 String formatDateTime(DateTime dt) {
   return DateFormat('yyyy-MM-dd HH:mm').format(dt);
+}
+
+/// 仅日期格式化（用于过期日期显示）
+String formatDate(DateTime dt) {
+  return DateFormat('yyyy-MM-dd').format(dt);
 }
