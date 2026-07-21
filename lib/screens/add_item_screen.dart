@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../models/item.dart';
 import '../models/storage_space.dart';
 import '../utils/database_helper.dart';
+import 'barcode_scanner_screen.dart';
 
 /// 添加/编辑物品页面
 class AddItemScreen extends StatefulWidget {
@@ -262,12 +263,25 @@ class _AddItemScreenState extends State<AddItemScreen> {
             ),
             const SizedBox(height: 24),
 
-            // 物品名称
+            // 物品名称（带扫码入口）
             TextFormField(
               controller: _nameController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: '物品名称 *', hintText: '例如：电饭煲、冬季外套',
-                prefixIcon: Icon(Icons.inventory_2_rounded),
+                prefixIcon: const Icon(Icons.inventory_2_rounded),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.qr_code_scanner_rounded, color: Colors.green),
+                  tooltip: '扫描条码',
+                  onPressed: () async {
+                    final barcode = await Navigator.push<String>(
+                      context,
+                      MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
+                    );
+                    if (barcode != null && mounted) {
+                      _nameController.text = barcode;
+                    }
+                  },
+                ),
               ),
               textInputAction: TextInputAction.next,
               autofocus: true,
