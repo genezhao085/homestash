@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import '../models/item.dart';
 import '../models/storage_space.dart';
@@ -39,6 +40,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
   final _noteController = TextEditingController();
 
   String? _photoPath;
+  String? _remoteImageUrl; // 扫码预填的远程图片URL，展示用
   String? _barcode;
   StorageSpace? _selectedSpace;
   DateTime? _expiryDate; // 过期日期
@@ -80,6 +82,11 @@ class _AddItemScreenState extends State<AddItemScreen> {
       }
       if (widget.prefillBrand != null && widget.prefillBrand!.isNotEmpty) {
         _noteController.text = '品牌: ${widget.prefillBrand}';
+      }
+      // 扫码预填商品图片URL
+      if (widget.prefillImageUrl != null && widget.prefillImageUrl!.isNotEmpty) {
+        _remoteImageUrl = widget.prefillImageUrl;
+        _downloadPrefillImage(widget.prefillImageUrl!);
       }
     }
   }
@@ -182,6 +189,29 @@ class _AddItemScreenState extends State<AddItemScreen> {
           behavior: SnackBarBehavior.floating,
         ),
       );
+    }
+  }
+
+  /// 下载扫码预填的远程图片到本地临时文件
+  Future<void> _downloadPrefillImage(String url) async {
+    try {
+      final response = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200 && mounted) {
+        final tempDir = Directory.systemTemp;
+        final ext = url.split('.').lastOrNull?.split('?').firstOrNull ?? 'jpg';
+        final file = File(
+          '${tempDir.path}/homestash_prefill_${DateTime.now().millisecondsSinceEpoch}.$ext',
+        );
+        await file.writeAsBytes(response.bodyBytes);
+        setState(() {
+          _photoPath = file.path;
+          _remoteImageUrl = null; // 已下载到本地，清除远程URL引用
+        });
+      }
+    } catch (_) {
+      // 下载失败则保留远程URL展示，用户仍可选择手动拍照
     }
   }
 
@@ -332,9 +362,11 @@ class _AddItemScreenState extends State<AddItemScreen> {
                     border: Border.all(color: Theme.of(context).colorScheme.outline, width: 1.5),
                     image: _photoPath != null
                         ? DecorationImage(image: FileImage(File(_photoPath!)), fit: BoxFit.cover)
-                        : null,
+                        : _remoteImageUrl != null
+                            ? DecorationImage(image: NetworkImage(_remoteImageUrl!), fit: BoxFit.cover)
+                            : null,
                   ),
-                  child: _photoPath == null
+                  child: (_photoPath == null && _remoteImageUrl == null)
                       ? Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
