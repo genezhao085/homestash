@@ -11,8 +11,22 @@ import 'barcode_scanner_screen.dart';
 class AddItemScreen extends StatefulWidget {
   final Item? existingItem;
   final StorageSpace? preselectedSpace; // 从空间浏览器进入时预选
+  final String? prefillBarcode;  // 扫码预填——条码号
+  final String? prefillName;     // 扫码预填——商品名
+  final String? prefillCategory; // 扫码预填——分类
+  final String? prefillBrand;    // 扫码预填——品牌
+  final String? prefillImageUrl; // 扫码预填——商品图片URL
 
-  const AddItemScreen({super.key, this.existingItem, this.preselectedSpace});
+  const AddItemScreen({
+    super.key,
+    this.existingItem,
+    this.preselectedSpace,
+    this.prefillBarcode,
+    this.prefillName,
+    this.prefillCategory,
+    this.prefillBrand,
+    this.prefillImageUrl,
+  });
 
   @override
   State<AddItemScreen> createState() => _AddItemScreenState();
@@ -50,6 +64,23 @@ class _AddItemScreenState extends State<AddItemScreen> {
       _barcode = item.barcode;
       _expiryDate = item.expiryDate;
       _loadSelectedSpace(item.spaceId);
+    } else {
+      // 处理扫码预填数据
+      if (widget.prefillBarcode != null) {
+        _barcode = widget.prefillBarcode;
+      }
+      if (widget.prefillName != null && widget.prefillName!.isNotEmpty) {
+        _nameController.text = widget.prefillName!;
+      } else if (widget.prefillBarcode != null) {
+        // 无商品名时填条码号，提示用户手动修改
+        _nameController.text = widget.prefillBarcode!;
+      }
+      if (widget.prefillCategory != null && widget.prefillCategory!.isNotEmpty) {
+        _categoryController.text = widget.prefillCategory!;
+      }
+      if (widget.prefillBrand != null && widget.prefillBrand!.isNotEmpty) {
+        _noteController.text = '品牌: ${widget.prefillBrand}';
+      }
     }
   }
 

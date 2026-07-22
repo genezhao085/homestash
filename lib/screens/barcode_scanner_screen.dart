@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../services/barcode_lookup_service.dart';
+import 'add_item_screen.dart';
 
 /// 条形码扫描页面 —— 扫描后自动查询商品信息
 class BarcodeScannerScreen extends StatefulWidget {
@@ -49,26 +50,30 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
     });
   }
 
-  /// 确认使用查询到的商品信息并返回
+  /// 确认使用查询到的商品信息 → 直接导航到 AddItemScreen
   void _confirmProduct() {
-    final result = <String, String>{'barcode': _barcode!};
-    if (_product != null && !_product!.isEmpty) {
-      result['name'] = _product!.name;
-      result['category'] = _product!.category;
-      result['brand'] = _product!.brand;
-      if (_product!.imageUrl != null) {
-        result['imageUrl'] = _product!.imageUrl!;
-      }
-      if (_product!.description != null) {
-        result['description'] = _product!.description!;
-      }
-    }
-    Navigator.pop(context, result);
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddItemScreen(
+          prefillBarcode: _barcode,
+          prefillName: _product?.name,
+          prefillCategory: _product?.category,
+          prefillBrand: _product?.brand,
+          prefillImageUrl: _product?.imageUrl,
+        ),
+      ),
+    );
   }
 
-  /// 仅使用条码号返回
+  /// 仅使用条码号 → 直接导航到 AddItemScreen
   void _useBarcodeOnly() {
-    Navigator.pop(context, <String, String>{'barcode': _barcode!});
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddItemScreen(prefillBarcode: _barcode),
+      ),
+    );
   }
 
   /// 重新扫描

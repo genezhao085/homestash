@@ -11,8 +11,16 @@ import '../services/export_import_service.dart';
 import '../widgets/item_card.dart';
 import '../widgets/shimmer_loading.dart';
 import 'add_item_screen.dart';
+import 'barcode_scanner_screen.dart';
 import 'item_detail_screen.dart';
 import 'storage_screen.dart';
+
+/// 导出/导入操作类型
+enum _ExportAction {
+  exportJson,
+  exportCsv,
+  importBackup,
+}
 
 /// 首页 - 底部导航容器
 class HomeScreen extends StatefulWidget {
@@ -68,6 +76,7 @@ class _ItemListPageState extends State<_ItemListPage> {
   List<String> _categories = [];
   List<String> _locations = [];
   bool _isLoading = true;
+  bool _isFabOpen = false;
 
   @override
   void initState() {
@@ -92,6 +101,10 @@ class _ItemListPageState extends State<_ItemListPage> {
         _isLoading = false;
       });
     }
+  }
+
+  void _toggleFab() {
+    setState(() => _isFabOpen = !_isFabOpen);
   }
 
   void _showDeleteConfirm(Item item) {
@@ -318,16 +331,69 @@ class _ItemListPageState extends State<_ItemListPage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const AddItemScreen()),
-          );
-          if (result == true) _loadData();
-        },
-        icon: const Icon(Icons.add_photo_alternate_rounded),
-        label: const Text('添加物品'),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // 展开的子 FAB 按钮
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            alignment: Alignment.bottomCenter,
+            child: _isFabOpen
+                ? Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // 扫码入库
+                        _SubFab(
+                          icon: Icons.qr_code_scanner_rounded,
+                          label: '扫码入库',
+                          onTap: () async {
+                            _toggleFab();
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    const BarcodeScannerScreen(),
+                              ),
+                            );
+                            if (result == true) _loadData();
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        // 添加物品
+                        _SubFab(
+                          icon: Icons.add_photo_alternate_rounded,
+                          label: '添加物品',
+                          onTap: () async {
+                            _toggleFab();
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const AddItemScreen(),
+                              ),
+                            );
+                            if (result == true) _loadData();
+                          },
+                        ),
+                      ],
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+          // 主 FAB —— 展开/收起
+          FloatingActionButton.extended(
+            onPressed: _toggleFab,
+            icon: AnimatedRotation(
+              turns: _isFabOpen ? 0.125 : 0,
+              duration: const Duration(milliseconds: 200),
+              child: const Icon(Icons.add_rounded),
+            ),
+            label: const Text('添加'),
+          ),
+        ],
       ),
     );
   }
@@ -643,6 +709,60 @@ class _ItemListPageState extends State<_ItemListPage> {
             child: const Text('确定'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 子 FAB 按钮 —— 带标签的小型悬浮菜单项
+class _SubFab extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _SubFab({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: cs.secondaryContainer,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(30),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 20, color: cs.onSecondaryContainer),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: cs.onSecondaryContainer,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
