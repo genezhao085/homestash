@@ -381,6 +381,31 @@ class _AddItemScreenState extends State<AddItemScreen> {
             ),
             const SizedBox(height: 24),
 
+            // 条码号（扫码确定，不可编辑）
+            if (_barcode != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Row(
+                  children: [
+                    Icon(Icons.qr_code_rounded, size: 20, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      '条码号: $_barcode',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Theme.of(context).colorScheme.outline,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    const Spacer(),
+                    Tooltip(
+                      message: '条码号由扫描确定，不可编辑',
+                      child: Icon(Icons.info_outline, size: 16, color: Theme.of(context).colorScheme.outline),
+                    ),
+                  ],
+                ),
+              ),
+
             // 物品名称（带扫码入口）
             TextFormField(
               controller: _nameController,
