@@ -8,17 +8,25 @@ import '../models/storage_space.dart';
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
+  static bool _initFailed = false;
 
   DatabaseHelper._init();
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDatabase();
-    return _database!;
+    if (_initFailed) throw Exception('数据库初始化失败');
+    try {
+      _database = await _initDatabase();
+      return _database!;
+    } catch (e) {
+      _initFailed = true;
+      rethrow;
+    }
   }
 
   Future<Database> _initDatabase() async {
-    final dbPath = await getDatabasesPath();
+    final dbPath = await getDatabasesPath()
+        .timeout(const Duration(seconds: 10));
     final path = join(dbPath, 'homestash.db');
 
     return await openDatabase(
@@ -94,7 +102,7 @@ class DatabaseHelper {
           } catch (_) {}
         }
       },
-    );
+    ).timeout(const Duration(seconds: 10));
   }
 
   // ====================== 物品 CRUD ======================

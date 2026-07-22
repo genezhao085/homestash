@@ -27,17 +27,26 @@ class _StorageScreenState extends State<StorageScreen> {
 
   Future<void> _loadSpaces() async {
     setState(() => _isLoading = true);
-    final roots = await _db.getRootSpaces();
-    final nodes = <_SpaceNode>[];
-    for (final root in roots) {
-      final node = await _buildNode(root);
-      nodes.add(node);
-    }
-    if (mounted) {
-      setState(() {
-        _rootNodes = nodes;
-        _isLoading = false;
-      });
+    try {
+      final roots = await _db.getRootSpaces();
+      final nodes = <_SpaceNode>[];
+      for (final root in roots) {
+        final node = await _buildNode(root);
+        nodes.add(node);
+      }
+      if (mounted) {
+        setState(() {
+          _rootNodes = nodes;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('_loadSpaces error: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
