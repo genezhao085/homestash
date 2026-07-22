@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-import 'package:file_picker/file_picker.dart';
 import '../models/item.dart';
 import '../models/storage_space.dart';
 import '../utils/database_helper.dart';
@@ -121,13 +120,16 @@ class _AddItemScreenState extends State<AddItemScreen> {
         }
         return;
       }
-      // Web: use FilePicker instead of image_picker
+      // Web: use image_picker (has first-class web support via image_picker_for_web)
       try {
-        final result = await FilePicker.platform.pickFiles(
-          type: FileType.image,
+        final XFile? photo = await _picker.pickImage(
+          source: ImageSource.gallery,
+          maxWidth: 1600,
+          imageQuality: 85,
         );
-        if (result != null && result.files.isNotEmpty && mounted) {
-          setState(() => _photoPath = result.files.single.name);
+        if (photo != null && mounted) {
+          setState(() => _photoPath = photo.path);
+          // AI recognition not available on web
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -140,7 +142,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('选择文件失败: $e'), behavior: SnackBarBehavior.floating),
+            SnackBar(content: Text('选择照片失败: $e'), behavior: SnackBarBehavior.floating),
           );
         }
       }
