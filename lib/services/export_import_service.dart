@@ -162,8 +162,8 @@ class ExportImportService {
           strategy: strategy,
           errors: errors,
         );
-        itemsImported = result['imported'];
-        itemsSkipped = result['skipped'];
+        itemsImported = result['imported'] ?? 0;
+        itemsSkipped = result['skipped'] ?? 0;
       }
     } on FormatException catch (e) {
       errors.add('JSON 解析失败：${e.message}');

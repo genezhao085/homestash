@@ -29,6 +29,7 @@ dependencies:
   file_picker: ^8.0.0
   # CSV 解析
   csv: ^6.0.0
+  sqflite_common_ffi_web: ^1.1.2
 
 dev_dependencies:
   flutter_test:

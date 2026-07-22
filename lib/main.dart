@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 import 'screens/splash_screen.dart';
 import 'utils/app_theme.dart';
+import 'utils/database_init.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initDatabase();
   runApp(const HomeStashApp());
 }
 
