@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../utils/app_theme.dart';
 
@@ -16,6 +17,7 @@ class _SplashScreenState extends State<SplashScreen>
   late final AnimationController _controller;
   late final Animation<double> _fadeIn;
   late final Animation<double> _scaleUp;
+  Timer? _navigationTimer;
 
   @override
   void initState() {
@@ -38,7 +40,7 @@ class _SplashScreenState extends State<SplashScreen>
     _controller.forward();
 
     // 2.5 秒后自动跳转到主页
-    Future.delayed(const Duration(milliseconds: 2500), () {
+    _navigationTimer = Timer(const Duration(milliseconds: 2500), () {
       if (mounted) {
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
@@ -55,6 +57,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
+    _navigationTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }

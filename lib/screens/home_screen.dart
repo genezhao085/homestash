@@ -4,13 +4,13 @@ import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/item.dart';
-import '../models/storage_space.dart';
 import '../utils/database_helper.dart';
 import '../utils/app_theme.dart';
 import '../services/export_import_service.dart';
 import '../widgets/item_card.dart';
 import '../widgets/shimmer_loading.dart';
 import 'add_item_screen.dart';
+import 'ai_query_screen.dart';
 import 'barcode_scanner_screen.dart';
 import 'item_detail_screen.dart';
 import 'storage_screen.dart';
@@ -260,14 +260,36 @@ class _ItemListPageState extends State<_ItemListPage> {
               decoration: InputDecoration(
                 hintText: '搜索物品名称、分类、位置...',
                 prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_searchQuery.isNotEmpty)
+                      IconButton(
                         icon: const Icon(Icons.clear),
                         onPressed: () {
                           setState(() => _searchQuery = '');
                           _loadData();
-                        })
-                    : null,
+                        }),
+                    IconButton(
+                      icon: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: AppColors.green100,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.auto_awesome, size: 18, color: AppColors.primary),
+                      ),
+                      tooltip: 'AI 自然语言查询',
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const AIQueryScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
                 contentPadding: const EdgeInsets.symmetric(vertical: 0),
               ),
               onChanged: (v) {

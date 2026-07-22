@@ -27,6 +27,8 @@ dependencies:
   share_plus: ^10.0.0
   # 文件选择
   file_picker: ^8.0.0
+  # CSV 解析
+  csv: ^6.0.0
 
 dev_dependencies:
   flutter_test:
