@@ -6,7 +6,11 @@ import 'utils/database_init.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initDatabase();
+  try {
+    await initDatabase();
+  } catch (e) {
+    debugPrint('initDatabase error: $e');
+  }
   runApp(const HomeStashApp());
 }
 

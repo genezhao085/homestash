@@ -86,20 +86,29 @@ class _ItemListPageState extends State<_ItemListPage> {
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-    final items = await _db.getAllItems(
-      searchQuery: _searchQuery.isNotEmpty ? _searchQuery : null,
-      category: _selectedCategory,
-      location: _selectedLocation,
-    );
-    final categories = await _db.getCategories();
-    final locations = await _db.getLocations();
-    if (mounted) {
-      setState(() {
-        _items = items;
-        _categories = categories;
-        _locations = locations;
-        _isLoading = false;
-      });
+    try {
+      final items = await _db.getAllItems(
+        searchQuery: _searchQuery.isNotEmpty ? _searchQuery : null,
+        category: _selectedCategory,
+        location: _selectedLocation,
+      );
+      final categories = await _db.getCategories();
+      final locations = await _db.getLocations();
+      if (mounted) {
+        setState(() {
+          _items = items;
+          _categories = categories;
+          _locations = locations;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('_loadData error: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
