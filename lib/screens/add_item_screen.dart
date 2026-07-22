@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import '../models/item.dart';
 import '../models/storage_space.dart';
 import '../utils/database_helper.dart';
@@ -107,6 +109,44 @@ class _AddItemScreenState extends State<AddItemScreen> {
   }
 
   Future<void> _pickPhoto(ImageSource source) async {
+    if (kIsWeb) {
+      if (source == ImageSource.camera) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('📷 Web 版暂不支持拍照，请从相册选择或手动输入'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+      // Web: use FilePicker instead of image_picker
+      try {
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.image,
+        );
+        if (result != null && result.files.isNotEmpty && mounted) {
+          setState(() => _photoPath = result.files.single.name);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('✅ 已选择图片（Web 暂不支持 AI 识别，请手动填写）'),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('选择文件失败: $e'), behavior: SnackBarBehavior.floating),
+          );
+        }
+      }
+      return;
+    }
+
     if (source == ImageSource.gallery) {
       // macOS: 使用 AppleScript 调用原生文件选择对话框
       if (!Platform.isAndroid && !Platform.isIOS) {
