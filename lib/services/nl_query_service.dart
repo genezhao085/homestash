@@ -37,6 +37,7 @@ class NLQueryService {
   /// 也支持 OPENROUTER_API_KEY 作为备选
   static List<String> _apiKeySources() {
     return const [
+      'QWEN_API_KEY',
       'DEEPSEEK_API_KEY',
       'OPENROUTER_API_KEY',
     ];
@@ -45,10 +46,19 @@ class NLQueryService {
   static String? _resolveApiKey() {
     for (final source in _apiKeySources()) {
       final key = String.fromEnvironment(source);
-      if (key.isNotEmpty) return key;
+      if (key.isNotEmpty) {
+        if (source == 'QWEN_API_KEY') {
+          _currentApiUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+          _currentModel = 'qwen3.8-max';
+        }
+        return key;
+      }
     }
     return null;
   }
+
+  static String _currentApiUrl = _apiUrl;
+  static String _currentModel = _model;
 
   /// 解释自然语言查询，返回结构化结果
   static Future<NLQueryResult> interpret(String query) async {
@@ -71,13 +81,16 @@ class NLQueryService {
     try {
       final response = await http
           .post(
-            Uri.parse(_apiUrl),
+            Uri.parse(_currentApiUrl),
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': 'Bearer $apiKey',
+              if (_currentApiUrl.contains('dashscope'))
+                'Authorization': 'Bearer $apiKey'
+              else
+                'Authorization': 'Bearer $apiKey',
             },
             body: jsonEncode({
-              'model': _model,
+              'model': _currentModel,
               'messages': [
                 {
                   'role': 'system',
